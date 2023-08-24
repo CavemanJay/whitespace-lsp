@@ -12,7 +12,7 @@ use tree_sitter::{Node, Point, Query};
 use whitespace::{
     parse::tree_sitter::{tokenize, NodeIterator, IGNORED_RULES},
     to_visible,
-    tokens::{Label, Num},
+    tokens::{FlowControlOp, Label, Num},
 };
 
 fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
@@ -154,14 +154,21 @@ fn main_loop(
 
                         let path = params.text_document.uri.to_file_path().unwrap();
                         let source = std::fs::read_to_string(path).unwrap();
-                        let tree = tokenize(&source);
-                        // let labels = NodeIterator::new(&tree).collect::<Vec<_>>();
-                        let hints = NodeIterator::new(&tree)
-                            .filter(|n| n.kind() == "label")
-                            .map(|n| {
-                                let label: Label = n.into();
+                        let ast = whitespace::parse::tree_sitter::parse(&source).unwrap();
+                        let flows = ast.flow_control_ops(&source);
+                        let hints = flows
+                            .iter()
+                            .map(|(n, op)| {
+                                eprintln!("op: {:#?}", op);
+                                // let hint = match op {
+                                //     FlowControlOp::Label(label) => label.name(),
+                                //     _ => "".to_string(),
+                                // };
                                 InlayHint {
-                                    label: InlayHintLabel::String(format!("{label:?}")),
+                                    // label: InlayHintLabel::String(format!("{:#?}", op)),
+                                    label: InlayHintLabel::String(
+                                        format!("{}", op).replace("label ", ""),
+                                    ),
                                     kind: Some(InlayHintKind::TYPE),
                                     position: n.end_position().to_lsp_pos(),
                                     text_edits: None,
